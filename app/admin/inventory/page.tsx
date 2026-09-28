@@ -12,8 +12,10 @@ export default function InventoryPage() {
   // Mobile Sidebar State
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Search State & Ref
+  // Search & Filter States
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All Categories');
+  const [selectedStatus, setSelectedStatus] = useState('All Status');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Main container ref & scroll to top state
@@ -33,7 +35,7 @@ export default function InventoryPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, stock, price, category, image')
+        .select('*')
         .order('name', { ascending: true });
 
       if (error) {
@@ -81,9 +83,10 @@ export default function InventoryPage() {
     setSubmitting(true);
 
     try {
+      const stockNum = parseInt(newStock) || 0;
       const { error } = await supabase
         .from('products')
-        .update({ stock: parseInt(newStock) || 0 })
+        .update({ stock: stockNum })
         .eq('id', selectedProduct.id);
 
       if (error) throw error;
@@ -99,10 +102,42 @@ export default function InventoryPage() {
     }
   };
 
-  // Filter products based on search query
-  const filteredProducts = products.filter((item) =>
-    item.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Unique Categories list for dropdown
+  const categoriesList = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
+
+  // Filtered Products calculation based on search, category & status dropdowns
+  const filteredProducts = products.filter((item) => {
+    const stockVal = Number(item.stock || 0);
+    const matchesSearch = 
+      item.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.sku?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.category?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    // Dropdown Category filtering
+    if (selectedCategory !== 'All Categories' && item.category !== selectedCategory) return false;
+
+    // Dropdown Status filtering
+    if (selectedStatus === 'In Stock' && stockVal <= 5) return false;
+    if (selectedStatus === 'Low Stock' && (stockVal > 5 || stockVal <= 0)) return false;
+    if (selectedStatus === 'Out of Stock' && stockVal > 0) return false;
+
+    return true;
+  });
+
+  // Metrics Calculations
+  const totalProductsCount = products.length;
+  const inStockCount = products.filter(p => Number(p.stock || 0) > 5).length;
+  const lowStockCount = products.filter(p => {
+    const s = Number(p.stock || 0);
+    return s > 0 && s <= 5;
+  }).length;
+  const outOfStockCount = products.filter(p => Number(p.stock || 0) <= 0).length;
+
+  const lowStockPercentage = totalProductsCount ? Math.round((lowStockCount / totalProductsCount) * 100) : 0;
+  const outOfStockPercentage = totalProductsCount ? Math.round((outOfStockCount / totalProductsCount) * 100) : 0;
+  const inStockPercentage = totalProductsCount ? Math.round((inStockCount / totalProductsCount) * 100) : 100;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex font-sans">
@@ -111,12 +146,11 @@ export default function InventoryPage() {
       <main 
         ref={mainRef}
         onScroll={handleScroll}
-        className="flex-1 flex flex-col min-w-0 overflow-y-auto relative"
+        className="flex-1 flex flex-col min-w-0 overflow-y-auto relative pb-12"
       >
-        {/* Header with Mobile Menu Toggle and Search Bar */}
-        <header className="bg-white border-b border-slate-200 h-16 px-4 md:px-8 flex items-center justify-between sticky top-0 z-20 gap-4">
+        {/* Header with Mobile Menu Toggle and Title */}
+        <header className="bg-white border-b border-slate-200 h-16 px-4 md:px-8 flex items-center justify-between sticky top-0 z-20 gap-4 shadow-xs">
           <div className="flex items-center gap-3">
-            {/* Mobile Menu Toggle Button */}
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
@@ -124,106 +158,213 @@ export default function InventoryPage() {
             >
               <Menu size={22} />
             </button>
-            <h1 className="text-base font-bold text-slate-900 hidden sm:block">Inventory Management</h1>
-          </div>
-
-          {/* Active Search Bar */}
-          <div className="flex-1 max-w-md relative">
-            <button
-              type="button"
-              onClick={() => searchInputRef.current?.focus()}
-              className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-600 hover:text-blue-600 transition-colors cursor-pointer bg-transparent border-none"
-              title="Click to search"
-            >
-              <Search size={16} />
-            </button>
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search inventory by name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 placeholder-slate-500 focus:outline-blue-600 transition-all"
-            />
+            <div>
+              <h1 className="text-sm md:text-base font-extrabold text-slate-900">Inventory Management</h1>
+              <p className="text-[10px] text-slate-400 hidden sm:block">Manage your product stock, update quantities and keep track of low stock items.</p>
+            </div>
           </div>
         </header>
 
         {/* Content */}
-        <div className="p-4 md:p-8 max-w-[1400px] w-full mx-auto space-y-6">
-          <div className="bg-white border border-slate-200 rounded-3xl p-4 md:p-6 shadow-2xs">
-            <div className="mb-5">
-              <h3 className="text-sm font-extrabold text-slate-900">Stock Levels & Warehouse</h3>
-              <p className="text-xs font-bold text-slate-400 mt-0.5">Manage and monitor inventory stock quantities across your product listings.</p>
+        <div className="p-4 md:p-8 max-w-[1500px] w-full mx-auto space-y-6">
+
+          {/* Top Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-slate-900">Total Products</span>
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Package size={18} />
+                </div>
+              </div>
+              <h2 className="text-2xl font-black text-slate-900">{totalProductsCount}</h2>
+              <p className="text-[10px] text-emerald-600 font-extrabold">Active in warehouse</p>
             </div>
 
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 size={28} className="animate-spin text-blue-600" />
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-slate-900">In Stock</span>
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <CheckCircle size={18} />
+                </div>
               </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 font-bold text-xs">
-                No products found matching your search.
+              <h2 className="text-2xl font-black text-slate-900">{inStockCount}</h2>
+              <p className="text-[10px] text-slate-400 font-extrabold">{inStockPercentage}% of total</p>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-slate-900">Low Stock</span>
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <AlertTriangle size={18} />
+                </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[700px]">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-100 text-xs font-extrabold text-slate-900 uppercase tracking-wider rounded-t-xl">
-                      <th className="py-3.5 px-4">Product Name</th>
-                      <th className="py-3.5 px-4">Category</th>
-                      <th className="py-3.5 px-4">Price</th>
-                      <th className="py-3.5 px-4">Stock Quantity</th>
-                      <th className="py-3.5 px-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs font-bold">
-                    {filteredProducts.map((item) => {
-                      const isLowStock = Number(item.stock) <= 5;
-                      return (
-                        <tr key={item.id} className="hover:bg-slate-50/75 transition-all">
-                          <td className="py-4 px-4 font-extrabold text-slate-900 flex items-center gap-3">
-                            {item.image ? (
-                              <img 
-                                src={item.image} 
-                                alt={item.name} 
-                                className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0" 
-                              />
-                            ) : (
-                              <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center shrink-0 border border-slate-200">
-                                <Package size={16} />
-                              </div>
-                            )}
-                            <span className="text-slate-900">{item.name}</span>
-                          </td>
-                          <td className="py-4 px-4 text-slate-400 font-bold">{item.category || '-'}</td>
-                          <td className="py-4 px-4 text-slate-900 font-extrabold">Rs. {Number(item.price || 0).toLocaleString()}</td>
-                          <td className="py-4 px-4">
-                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold border ${
-                              isLowStock 
-                                ? 'bg-rose-100 text-rose-800 border-rose-200' 
-                                : 'bg-emerald-100 text-emerald-900 border-emerald-200'
-                            }`}>
-                              {item.stock} in stock {isLowStock && '(Low)'}
-                            </span>
-                          </td>
-                          <td className="py-4 px-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenModal(item)}
-                              className="px-3 py-1.5 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-900 transition-all cursor-pointer inline-flex items-center gap-1.5 font-extrabold text-[11px]"
-                            >
-                              <Edit size={14} />
-                              <span>Update Stock</span>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <h2 className="text-2xl font-black text-slate-900">{lowStockCount}</h2>
+              <p className="text-[10px] text-amber-600 font-extrabold">{lowStockPercentage}% of total</p>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-slate-900">Out of Stock</span>
+                <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                  <Package size={18} />
+                </div>
               </div>
-            )}
+              <h2 className="text-2xl font-black text-slate-900">{outOfStockCount}</h2>
+              <p className="text-[10px] text-rose-600 font-extrabold">{outOfStockPercentage}% of total</p>
+            </div>
           </div>
+
+          {/* Main Inventory Section (Full Width) */}
+          <div className="space-y-4">
+            
+            {/* Search & Dropdown Filters Bar */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-wrap items-center gap-3">
+              <div className="flex-1 min-w-[220px] relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Search size={16} />
+                </span>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search by product name, SKU..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-blue-600 transition-all"
+                />
+              </div>
+
+              {/* Category Filter Dropdown */}
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold text-slate-700 focus:outline-blue-600 cursor-pointer"
+              >
+                <option value="All Categories">All Categories</option>
+                {categoriesList.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+
+              {/* Status Filter Dropdown */}
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-extrabold text-slate-700 focus:outline-blue-600 cursor-pointer"
+              >
+                <option value="All Status">All Status</option>
+                <option value="In Stock">In Stock</option>
+                <option value="Low Stock">Low Stock</option>
+                <option value="Out of Stock">Out of Stock</option>
+              </select>
+
+              {/* Reset Filters */}
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('All Categories');
+                  setSelectedStatus('All Status');
+                }}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-extrabold transition-all cursor-pointer"
+              >
+                Reset
+              </button>
+            </div>
+
+            {/* Products Table Card */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
+              <h3 className="text-sm font-extrabold text-slate-900 mb-4">Product Inventory List ({filteredProducts.length})</h3>
+
+              {loading ? (
+                <div className="flex justify-center items-center py-16">
+                  <Loader2 size={32} className="animate-spin text-blue-600" />
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="text-center py-16 text-slate-400 text-xs font-extrabold">
+                  Koi product inventory record nahi mila.
+                </div>
+              ) : (
+                <div className="overflow-x-auto min-h-[350px]">
+                  <table className="w-full text-left border-collapse min-w-[750px]">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-[11px] font-extrabold text-slate-400 uppercase">
+                        <th className="py-3 px-4">Product Name</th>
+                        <th className="py-3 px-4">SKU</th>
+                        <th className="py-3 px-4">Category</th>
+                        <th className="py-3 px-4">Stock Qty</th>
+                        <th className="py-3 px-4">Price</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs font-extrabold text-slate-900">
+                      {filteredProducts.map((item) => {
+                        const stockNum = Number(item.stock || 0);
+                        const isLow = stockNum > 0 && stockNum <= 5;
+                        const isOut = stockNum <= 0;
+
+                        const statusBadge = isOut ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold border bg-rose-50 text-rose-600 border-rose-100">Out of Stock</span>
+                        ) : isLow ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold border bg-amber-50 text-amber-600 border-amber-100">Low Stock ({stockNum})</span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold border bg-emerald-50 text-emerald-600 border-emerald-100">In Stock ({stockNum})</span>
+                        );
+
+                        return (
+                          <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-3">
+                                {item.image ? (
+                                  <img src={item.image} alt={item.name} className="w-9 h-9 rounded-xl object-cover shadow-xs" />
+                                ) : (
+                                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 font-extrabold flex items-center justify-center text-xs shadow-xs">
+                                    <Package size={16} />
+                                  </div>
+                                )}
+                                <div>
+                                  <h4 className="font-extrabold text-slate-900 line-clamp-1">{item.name || 'Unnamed Product'}</h4>
+                                  <span className="text-[10px] text-slate-400 font-bold">{item.color ? `Color: ${item.color}` : ''}</span>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3.5 px-4 text-slate-600 font-bold">
+                              {item.sku || `#SKU-${item.id ? item.id.slice(0, 5).toUpperCase() : '1000'}`}
+                            </td>
+
+                            <td className="py-3.5 px-4 text-slate-600 font-medium">
+                              {item.category || '-'}
+                            </td>
+
+                            <td className="py-3.5 px-4">
+                              {statusBadge}
+                            </td>
+
+                            <td className="py-3.5 px-4 text-slate-900 font-black">
+                              Rs. {Number(item.price || 0).toLocaleString()}
+                            </td>
+
+                            <td className="py-3.5 px-4 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenModal(item)}
+                                className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 transition-all cursor-pointer inline-flex items-center gap-1.5 font-extrabold text-[11px]"
+                              >
+                                <Edit size={13} />
+                                <span>Update</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+          </div>
+
         </div>
 
         {/* Scroll to Top Floating Button */}

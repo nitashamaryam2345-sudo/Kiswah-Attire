@@ -1,12 +1,12 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import AdminSidebar from "../components/AdminSidebar";
+import Link from "next/link";
 import { 
   ShieldCheck, UserPlus, Trash2, Edit, Loader2, CheckCircle2, 
   X, AlertCircle, Search, MoreVertical, Shield, User, CheckCircle, 
-  Mail, Calendar, Eye, EyeOff 
+  Mail, Calendar, Eye, EyeOff, Menu, Package, Boxes, ShoppingCart, Users, Settings 
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase'; // <-- Imported from lib/supabase
 
@@ -15,6 +15,7 @@ export default function AdminsPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -227,14 +228,20 @@ export default function AdminsPage() {
   const activeAdminsCount = admins.filter(a => (a.status || 'Active') === 'Active').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans">
-      <AdminSidebar />
+    <div className="min-h-screen bg-slate-50 flex font-sans pb-16 md:pb-0">
+      <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto relative pb-12">
         
         {/* Header */}
-        <header className="bg-white border-b border-slate-200 h-16 px-8 flex items-center justify-between sticky top-0 z-20 shadow-xs">
+        <header className="bg-white border-b border-slate-200 h-16 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20 shadow-xs gap-3">
           <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+            >
+              <Menu size={22} />
+            </button>
             <div>
               <h1 className="text-xs sm:text-sm font-extrabold text-slate-900">Admin Management</h1>
               <p className="text-[10px] text-slate-500">Manage who can access your store, assign roles and control permissions.</p>
@@ -242,14 +249,14 @@ export default function AdminsPage() {
           </div>
           <button
             onClick={handleOpenAddModal}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
+            className="px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-blue-600/20 transition-all cursor-pointer shrink-0"
           >
             <UserPlus size={16} />
-            <span>Add New Admin</span>
+            <span className="hidden sm:inline">Add New Admin</span>
           </button>
         </header>
 
-        <div className="p-8 max-w-[1400px] w-full mx-auto space-y-6">
+        <div className="p-4 sm:p-8 max-w-[1400px] w-full mx-auto space-y-6">
           
           {successMessage && (
             <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl flex items-center gap-3 shadow-lg">
@@ -353,7 +360,7 @@ export default function AdminsPage() {
               </div>
             ) : (
               <div className="overflow-x-auto min-h-[300px]">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse min-w-[600px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-[11px] font-extrabold text-slate-400 uppercase">
                       <th className="pb-3 px-4">Admin</th>
@@ -667,6 +674,22 @@ export default function AdminsPage() {
             </div>
           </div>
         )}
+
+        {/* Mobile Bottom Navigation Bar */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-2.5 flex items-center justify-around z-40 shadow-lg">
+          {[
+            { href: '/admin/dashboard', icon: Package, label: 'Dashboard' },
+            { href: '/admin/products', icon: Boxes, label: 'Products' },
+            { href: '/admin/orders', icon: ShoppingCart, label: 'Orders' },
+            { href: '/admin/customers', icon: Users, label: 'Customers' },
+            { href: '/admin/settings', icon: Settings, label: 'Settings' },
+          ].map((nav) => (
+            <Link key={nav.label} href={nav.href} className="flex flex-col items-center gap-1 text-[10px] font-bold text-slate-600 hover:text-blue-600 transition-colors">
+              <nav.icon size={18} />
+              <span>{nav.label}</span>
+            </Link>
+          ))}
+        </div>
 
       </main>
     </div>

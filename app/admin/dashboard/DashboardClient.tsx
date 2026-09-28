@@ -14,7 +14,6 @@ import {
   FileText,
   Boxes,
   Bell,
-  Calendar,
   ChevronDown,
   AlertCircle,
   X,
@@ -107,7 +106,6 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAdminDropdown, setShowAdminDropdown] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -118,15 +116,9 @@ export default function DashboardClient({
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   
   const searchIdRef = useRef(0);
-  const calendarRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const adminDropdownRef = useRef<HTMLDivElement>(null);
   const mainContainerRef = useRef<HTMLElement>(null);
-  
-  const [isClient, setIsClient] = useState(false);
-  const [customDate, setCustomDate] = useState('');
-  const [customTime, setCustomTime] = useState('');
-  const [currentDay, setCurrentDay] = useState('');
   
   const [notificationsList, setNotificationsList] = useState<Array<{
     id: number;
@@ -135,27 +127,6 @@ export default function DashboardClient({
     time: string;
     icon: string;
   }>>([]);
-
-  useEffect(() => {
-    setIsClient(true);
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    setCustomDate(`${year}-${month}-${day}`);
-    
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    setCustomTime(`${hours}:${minutes}`);
-
-    setCurrentDay(now.toLocaleDateString('en-US', { weekday: 'long' }));
-
-    const timer = setInterval(() => {
-      const liveNow = new Date();
-      setCurrentDay(liveNow.toLocaleDateString('en-US', { weekday: 'long' }));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   const handleScroll = (e: React.UIEvent<HTMLElement>) => {
     if (e.currentTarget.scrollTop > 250) {
@@ -173,9 +144,6 @@ export default function DashboardClient({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
-        setShowCalendar(false);
-      }
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
       }
@@ -334,8 +302,8 @@ export default function DashboardClient({
         onScroll={handleScroll}
         className="flex-1 flex flex-col min-w-0 overflow-y-auto h-screen relative"
       >
-        <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 min-h-[5rem] px-6 sm:px-8 pt-4 pb-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs gap-4">
-          <div className="flex items-center gap-3 w-full max-w-md">
+        <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 min-h-[5rem] px-4 sm:px-8 pt-4 pb-3 flex items-center justify-between sticky top-0 z-30 shadow-2xs gap-3">
+          <div className="flex items-center gap-2.5 flex-1 max-w-xl">
             <button 
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
@@ -346,7 +314,7 @@ export default function DashboardClient({
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text" 
-                placeholder="Search live products by name..." 
+                placeholder="Search live products..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-9 py-2.5 text-xs focus:outline-none focus:border-blue-600 transition-all text-slate-800 shadow-inner"
@@ -360,7 +328,7 @@ export default function DashboardClient({
               )}
 
               {searchQuery.trim() && (
-                <div className="fixed left-4 right-4 sm:left-auto sm:right-auto sm:absolute sm:w-80 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-72 overflow-y-auto divide-y divide-slate-100">
+                <div className="absolute left-0 right-0 sm:left-auto sm:right-auto sm:w-80 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-72 overflow-y-auto divide-y divide-slate-100">
                   <div className="px-3 py-2 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     Live Product Suggestions
                   </div>
@@ -395,68 +363,10 @@ export default function DashboardClient({
             </div>
           </div>
           
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="relative" ref={calendarRef}>
-              <button 
-                onClick={() => { setShowCalendar(prev => !prev); setShowNotifications(false); setShowAdminDropdown(false); }}
-                className="flex items-center gap-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 transition-all cursor-pointer shadow-2xs"
-              >
-                <Calendar size={16} className="text-blue-600 shrink-0" />
-                <span className="hidden sm:inline">
-                  {isClient && customDate ? new Date(customDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Select Date'}
-                </span>
-                <span className="sm:hidden font-bold tabular-nums text-blue-600">{customTime || '--:--'}</span>
-                <ChevronDown size={14} className="text-slate-400 shrink-0" />
-              </button>
-
-              {showCalendar && (
-                <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <span className="text-xs font-bold text-slate-800">Customize Date & Time</span>
-                    <button onClick={() => setShowCalendar(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer">
-                      <X size={14} />
-                    </button>
-                  </div>
-                  <div className="space-y-3 text-xs text-slate-600">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Select Date</label>
-                      <input 
-                        type="date" 
-                        value={customDate} 
-                        onChange={(e) => setCustomDate(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-600"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Select Time</label>
-                      <input 
-                        type="time" 
-                        value={customTime} 
-                        onChange={(e) => setCustomTime(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-600"
-                      />
-                    </div>
-                    <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-[11px] text-slate-500">
-                      <span>Day: <strong className="text-slate-800">{currentDay}</strong></span>
-                      <button 
-                        onClick={() => {
-                          const now = new Date();
-                          setCustomDate(now.toISOString().split('T')[0]);
-                          setCustomTime(now.toTimeString().slice(0,5));
-                        }} 
-                        className="text-blue-600 font-bold hover:underline cursor-pointer text-[10px]"
-                      >
-                        Reset to Now
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div className="relative" ref={notificationRef}>
               <button 
-                onClick={() => { setShowNotifications(prev => !prev); setShowCalendar(false); setShowAdminDropdown(false); }}
+                onClick={() => { setShowNotifications(prev => !prev); setShowAdminDropdown(false); }}
                 className="relative cursor-pointer text-slate-600 hover:text-slate-900 transition-colors p-2.5 rounded-xl hover:bg-slate-50"
               >
                 <Bell size={20} />
@@ -515,11 +425,10 @@ export default function DashboardClient({
               )}
             </div>
 
-            {/* Top Right Admin Profile Section with Clean Unknown/User Avatar */}
-            <div className="relative pl-4 border-l border-slate-200" ref={adminDropdownRef}>
+            <div className="relative pl-3 border-l border-slate-200" ref={adminDropdownRef}>
               <button 
-                onClick={() => { setShowAdminDropdown(prev => !prev); setShowCalendar(false); setShowNotifications(false); }}
-                className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-1.5 rounded-xl transition-all"
+                onClick={() => { setShowAdminDropdown(prev => !prev); setShowNotifications(false); }}
+                className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1.5 rounded-xl transition-all"
               >
                 <div className="text-right hidden sm:block">
                   <p className="text-xs font-bold text-slate-900">Admin</p>
@@ -530,13 +439,10 @@ export default function DashboardClient({
                   <div className="w-9 h-9 rounded-full overflow-hidden border border-slate-200 bg-blue-50 flex items-center justify-center text-blue-700">
                     <UserIcon size={18} />
                   </div>
-                  {/* Active Green Dot */}
                   <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
                 </div>
 
-                <svg className="w-4 h-4 text-slate-400 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
+                <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
               </button>
 
               {showAdminDropdown && (

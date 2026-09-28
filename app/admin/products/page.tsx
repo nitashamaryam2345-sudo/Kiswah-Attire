@@ -180,8 +180,16 @@ export default function ProductsPage() {
                     currentProducts.map((p: any) => (
                       <tr key={p.id} className="hover:bg-slate-50">
                         <td className="py-3 px-3 flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden border border-slate-200 shrink-0 flex items-center justify-center font-bold text-slate-800">
-                            {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : p.name[0]}
+                          <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200 shrink-0 flex items-center justify-center font-bold text-slate-800 shadow-xs">
+                            {p.image ? (
+                              <img 
+                                src={p.image} 
+                                alt={p.name} 
+                                className="w-12 h-12 min-w-[48px] min-h-[48px] object-cover rounded-xl" 
+                              />
+                            ) : (
+                              <span>{p.name?.[0]}</span>
+                            )}
                           </div>
                           <span className="font-extrabold text-slate-900">{p.name}</span>
                         </td>
@@ -228,7 +236,7 @@ export default function ProductsPage() {
                   ) : (
                     <tr>
                       <td colSpan={5} className="py-12 text-center text-slate-400 font-semibold text-xs">
-                        No products found in live database. Click "Add New Product" to create one.
+                        No products found in live database. Click &quot;Add New Product&quot; to create one.
                       </td>
                     </tr>
                   )}

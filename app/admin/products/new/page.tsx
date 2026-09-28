@@ -5,11 +5,7 @@ import { useRouter } from 'next/navigation';
 import AdminSidebar from "../../components/AdminSidebar";
 import { Package, PlusCircle, CheckCircle2, ArrowLeft, Loader2, Upload, AlertCircle, X, Check } from 'lucide-react';
 import Link from 'next/link';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase } from '@/lib/supabase';
 
 export default function AddProductPage() {
   const router = useRouter();
@@ -91,6 +87,7 @@ export default function AddProductPage() {
     try {
       let imageUrl = formData.image;
 
+      // 1. Upload Image to Supabase Storage if file selected
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${Date.now()}.${fileExt}`;
@@ -107,24 +104,31 @@ export default function AddProductPage() {
         imageUrl = publicURLData.publicUrl;
       }
 
-      const response = await fetch('/api/admin/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, image: imageUrl }),
-      });
+      // 2. Direct Insert into Supabase 'products' table
+      const { error: insertError } = await supabase
+        .from('products')
+        .insert([
+          {
+            name: formData.name,
+            category: formData.category,
+            sub_category: formData.subCategory,
+            description: formData.description,
+            price: Number(formData.price),
+            old_price: formData.oldPrice ? Number(formData.oldPrice) : null,
+            stock: Number(formData.stock),
+            status: formData.status,
+            image: imageUrl,
+          }
+        ]);
 
-      const result = await response.json();
+      if (insertError) throw new Error(insertError.message);
 
-      if (response.ok) {
-        setSuccessMessage(true);
-        setTimeout(() => {
-          router.push('/admin/products');
-          router.refresh();
-        }, 1200);
-      } else {
-        alert(`Failed to add product: ${result.error || 'Please try again.'}`);
-        setLoading(false);
-      }
+      setSuccessMessage(true);
+      setTimeout(() => {
+        router.push('/admin/products');
+        router.refresh();
+      }, 1200);
+
     } catch (error: any) {
       console.error('Error adding product:', error);
       alert(error.message || 'Something went wrong!');
